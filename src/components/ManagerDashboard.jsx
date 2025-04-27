@@ -1,37 +1,90 @@
 // src/components/ManagerDashboard.jsx
 import React, { useEffect, useState } from "react";
-import { Button, Modal, Form, Input, message } from "antd";
+import { Button, Modal, Form, Input, message, Select, DatePicker } from "antd";
 import { logout } from "../slices/authSlice"; // Import logout action
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
+import "antd/dist/reset.css"; // Or 'antd/dist/antd.css' for older versions
+import moment from "moment";
 
 const ManagerDashboard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { username, token, role } = useSelector((state) => state.auth);
-  const [error, setError] = useState(null); // Local state to store errors if any
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectForm] = Form.useForm();
 
+  const [filters, setFilters] = useState({
+    date: "",
+    employee: "",
+    tags: "",
+    status: "",
+  });
+  
+
+  // Fetch tasks based on filters
   const fetchTasks = async () => {
     try {
-      const response = await axios.get(
-        "http://127.0.0.1:8000/api/tracker/tasks/",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`, // Include token in the request header
-          },
-        }
-      );
-      setTasks(response.data.tasks); // Update state with the new list of tasks
+      const { date, employee, tags, status } = filters;
+      let url = "http://127.0.0.1:8000/api/tracker/tasks/?";
+
+      if (date) {
+        url += `date=${date}&`;
+      }
+      if (employee) {
+        url += `employee=${employee}&`;
+      }
+      if (tags) {
+        url += `tags=${tags}&`;
+      }
+      if (status) {
+        url += `status=${status}&`;
+      }
+
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${token}`, // Include token in the request header
+        },
+      });
+
+      setTasks(response.data.tasks);
     } catch (error) {
-      setError("Failed to load tasks");
       console.error("Error fetching tasks:", error);
     }
   };
+
+  useEffect(() => {
+    if (role === "manager" && token) {
+      fetchTasks(); // Fetch tasks when the component mounts
+    }
+  }, [role, token, filters]); // Add filters as a dependency
+
+  // Update filter state
+  const handleFilterChange = (value, key) => {
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      [key]: value,
+    }));
+  };
+
+  //   const fetchTasks = async () => {
+  //     try {
+  //       const response = await axios.get(
+  //         "http://127.0.0.1:8000/api/tracker/tasks/",
+  //         {
+  //           headers: {
+  //             Authorization: `Bearer ${token}`, // Include token in the request header
+  //           },
+  //         }
+  //       );
+  //       setTasks(response.data.tasks); // Update state with the new list of tasks
+  //     } catch (error) {
+  //       console.error("Error fetching tasks:", error);
+  //     }
+  //   };
 
   useEffect(() => {
     if (role === "manager" && token) {
@@ -45,7 +98,6 @@ const ManagerDashboard = () => {
           setTasks(response.data.tasks);
         })
         .catch((err) => {
-          setError("Failed to load tasks");
           console.error("Error fetching tasks:", err);
         });
     }
@@ -110,6 +162,65 @@ const ManagerDashboard = () => {
     <div className="dashboard-container">
       <h2>Manager Dashboard</h2>
       <p>Welcome to the manager dashboard.</p>
+
+      {/* Filters Section */}
+      <div className="filters-section">
+        <h3>Filters</h3>
+        <Form layout="inline">
+          <Form.Item label="Date">
+            <DatePicker
+              onChange={(date, dateString) =>
+                handleFilterChange(dateString, "date")
+              }
+              value={filters.date ? moment(filters.date) : null}
+            />
+          </Form.Item>
+
+          <Form.Item label="Employee">
+            <Input
+              placeholder="Employee id"
+              value={filters.employee}
+              onChange={(e) => handleFilterChange(e.target.value, "employee")}
+            />
+          </Form.Item>
+
+          <Form.Item label="Tags">
+            <Input
+              placeholder="Tags"
+              value={filters.tags}
+              onChange={(e) => handleFilterChange(e.target.value, "tags")}
+            />
+          </Form.Item>
+
+          <Form.Item label="Status">
+            <Select
+              value={filters.status}
+              onChange={(value) => handleFilterChange(value, "status")}
+              allowClear
+            >
+              <Select.Option value="pending">Pending</Select.Option>
+              <Select.Option value="approved">Approved</Select.Option>
+              <Select.Option value="rejected">Rejected</Select.Option>
+            </Select>
+          </Form.Item>
+
+          {/* <Form.Item>
+            <Button type="primary" onClick={fetchTasks}>
+              Apply Filters
+            </Button>
+          </Form.Item> */}
+          <Form.Item>
+            <Button
+              onClick={() =>
+                setFilters({ date: "", employee: "", tags: "", status: "" })
+              }
+              type="default"
+            >
+              Clear Filters
+            </Button>
+          </Form.Item>
+        </Form>
+      </div>
 
       <div>
         <h3>Employee Tasks</h3>
